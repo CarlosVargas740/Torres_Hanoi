@@ -1,0 +1,2 @@
+set(__QT_DEPLOY_TARGET_TorresDeHanoi_FILE /home/charly/Documentos/Programacion Estructurada/torres_hanoi/build/TorresDeHanoi)
+set(__QT_DEPLOY_TARGET_TorresDeHanoi_TYPE EXECUTABLE)

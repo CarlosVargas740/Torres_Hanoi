@@ -1,0 +1,675 @@
+#include "mainwindow.h"
+#include <QMouseEvent>
+#include <QMessageBox>
+#include <QPropertyAnimation>
+#include <QSequentialAnimationGroup>
+#include <QGraphicsDropShadowEffect>
+#include <QPalette>
+#include <QGroupBox>
+#include <algorithm>
+#include <cmath>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , numDiscos(3)
+    , contadorMovimientos(0)
+    , tiempoTranscurrido(0)
+    , velocidadAnimacion(300)
+    , juegoIniciado(false)
+    , resolviendoAutomatico(false)
+    , temaOscuro(false)
+    , discoSeleccionado(nullptr)
+    , torreOrigen(-1)
+    , movimientoActual(0)
+{
+    configurarInterfaz();
+    aplicarTema();
+}
+
+MainWindow::~MainWindow()
+{
+}
+
+void MainWindow::configurarInterfaz()
+{
+    // Widget central
+    QWidget *centralWidget = new QWidget(this);
+    setCentralWidget(centralWidget);
+    
+    // Layout principal
+    QVBoxLayout *layoutPrincipal = new QVBoxLayout(centralWidget);
+    
+    // Título
+    QLabel *titulo = new QLabel("🗼 TORRES DE HANOI 🗼", this);
+    QFont fuenteTitulo;
+    fuenteTitulo.setPointSize(24);
+    fuenteTitulo.setBold(true);
+    titulo->setFont(fuenteTitulo);
+    titulo->setAlignment(Qt::AlignCenter);
+    titulo->setStyleSheet("color: #2c3e50; margin: 10px;");
+    layoutPrincipal->addWidget(titulo);
+    
+    // Panel de control superior
+    QHBoxLayout *layoutControl = new QHBoxLayout();
+    
+    // Grupo de configuración
+    QGroupBox *grupoConfig = new QGroupBox("Configuración", this);
+    QHBoxLayout *layoutConfig = new QHBoxLayout(grupoConfig);
+    
+    QLabel *lblDiscos = new QLabel("Número de discos:", this);
+    spinDiscos = new QSpinBox(this);
+    spinDiscos->setMinimum(3);
+    spinDiscos->setMaximum(8);
+    spinDiscos->setValue(3);
+    spinDiscos->setStyleSheet("QSpinBox { padding: 5px; font-size: 14px; }");
+    
+    btnIniciar = new QPushButton("🎮 Iniciar Juego", this);
+    btnIniciar->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #27ae60;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 10px 20px;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "    border-radius: 5px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #2ecc71;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #229954;"
+        "}"
+    );
+    
+    layoutConfig->addWidget(lblDiscos);
+    layoutConfig->addWidget(spinDiscos);
+    layoutConfig->addWidget(btnIniciar);
+    
+    // Grupo de acciones
+    QGroupBox *grupoAcciones = new QGroupBox("Acciones", this);
+    QHBoxLayout *layoutAcciones = new QHBoxLayout(grupoAcciones);
+    
+    btnResolver = new QPushButton("🤖 Resolver Automático", this);
+    btnResolver->setEnabled(false);
+    btnResolver->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #3498db;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 10px 20px;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "    border-radius: 5px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #5dade2;"
+        "}"
+        "QPushButton:disabled {"
+        "    background-color: #bdc3c7;"
+        "}"
+    );
+    
+    btnResolverDesde = new QPushButton("⚡ Resolver desde aquí", this);
+    btnResolverDesde->setEnabled(false);
+    btnResolverDesde->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #e67e22;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 10px 20px;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "    border-radius: 5px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #f39c12;"
+        "}"
+        "QPushButton:disabled {"
+        "    background-color: #bdc3c7;"
+        "}"
+    );
+    
+    btnReiniciar = new QPushButton("🔄 Reiniciar", this);
+    btnReiniciar->setEnabled(false);
+    btnReiniciar->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #e74c3c;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 10px 20px;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "    border-radius: 5px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #c0392b;"
+        "}"
+        "QPushButton:disabled {"
+        "    background-color: #bdc3c7;"
+        "}"
+    );
+    
+    btnTema = new QPushButton("🌙 Tema Oscuro", this);
+    btnTema->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #34495e;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 10px 20px;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "    border-radius: 5px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #2c3e50;"
+        "}"
+    );
+    
+    layoutAcciones->addWidget(btnResolver);
+    layoutAcciones->addWidget(btnResolverDesde);
+    layoutAcciones->addWidget(btnReiniciar);
+    layoutAcciones->addWidget(btnTema);
+    
+    layoutControl->addWidget(grupoConfig);
+    layoutControl->addWidget(grupoAcciones);
+    
+    layoutPrincipal->addLayout(layoutControl);
+    
+    // Panel de estadísticas
+    QHBoxLayout *layoutEstadisticas = new QHBoxLayout();
+    
+    lblMovimientos = new QLabel("Movimientos: 0", this);
+    lblMovimientos->setStyleSheet("font-size: 16px; font-weight: bold; color: #e74c3c;");
+    
+    lblMinMovimientos = new QLabel("Mínimo: 7", this);
+    lblMinMovimientos->setStyleSheet("font-size: 16px; font-weight: bold; color: #27ae60;");
+    
+    lblTiempo = new QLabel("Tiempo: 00:00", this);
+    lblTiempo->setStyleSheet("font-size: 16px; font-weight: bold; color: #3498db;");
+    
+    layoutEstadisticas->addWidget(lblMovimientos);
+    layoutEstadisticas->addWidget(lblMinMovimientos);
+    layoutEstadisticas->addWidget(lblTiempo);
+    layoutEstadisticas->addStretch();
+    
+    layoutPrincipal->addLayout(layoutEstadisticas);
+    
+    // Vista gráfica
+    escena = new QGraphicsScene(this);
+    vistaGrafica = new QGraphicsView(escena, this);
+    vistaGrafica->setRenderHint(QPainter::Antialiasing);
+    vistaGrafica->setMinimumHeight(400);
+    vistaGrafica->setStyleSheet("border: 2px solid #34495e; border-radius: 5px;");
+    layoutPrincipal->addWidget(vistaGrafica);
+    
+    // Control de velocidad
+    QHBoxLayout *layoutVelocidad = new QHBoxLayout();
+    QLabel *lblVelText = new QLabel("Velocidad de animación:", this);
+    lblVelText->setStyleSheet("font-size: 14px;");
+    
+    sliderVelocidad = new QSlider(Qt::Horizontal, this);
+    sliderVelocidad->setMinimum(1);
+    sliderVelocidad->setMaximum(10);
+    sliderVelocidad->setValue(7);
+    sliderVelocidad->setStyleSheet(
+        "QSlider::groove:horizontal {"
+        "    border: 1px solid #bbb;"
+        "    background: white;"
+        "    height: 10px;"
+        "    border-radius: 4px;"
+        "}"
+        "QSlider::handle:horizontal {"
+        "    background: #3498db;"
+        "    border: 1px solid #5c5c5c;"
+        "    width: 18px;"
+        "    margin: -2px 0;"
+        "    border-radius: 9px;"
+        "}"
+    );
+    
+    lblVelocidad = new QLabel("Normal", this);
+    lblVelocidad->setStyleSheet("font-size: 14px; font-weight: bold; color: #3498db;");
+    lblVelocidad->setMinimumWidth(80);
+    
+    layoutVelocidad->addWidget(lblVelText);
+    layoutVelocidad->addWidget(sliderVelocidad);
+    layoutVelocidad->addWidget(lblVelocidad);
+    
+    layoutPrincipal->addLayout(layoutVelocidad);
+    
+    // Instrucciones
+    QLabel *instrucciones = new QLabel(
+        "📖 Instrucciones: Click en un disco para seleccionarlo, luego click en una torre para moverlo. "
+        "¡Solo puedes mover un disco más pequeño sobre uno más grande!", this);
+    instrucciones->setWordWrap(true);
+    instrucciones->setStyleSheet("font-size: 12px; color: #7f8c8d; padding: 10px; background-color: #ecf0f1; border-radius: 5px;");
+    layoutPrincipal->addWidget(instrucciones);
+    
+    // Timers
+    timer = new QTimer(this);
+    timerJuego = new QTimer(this);
+    timerJuego->setInterval(1000);
+    
+    // Conexiones
+    connect(btnIniciar, &QPushButton::clicked, this, &MainWindow::iniciarJuego);
+    connect(btnResolver, &QPushButton::clicked, this, &MainWindow::resolverAutomatico);
+    connect(btnResolverDesde, &QPushButton::clicked, this, &MainWindow::resolverDesdeAqui);
+    connect(btnReiniciar, &QPushButton::clicked, this, &MainWindow::reiniciar);
+    connect(btnTema, &QPushButton::clicked, this, &MainWindow::cambiarTema);
+    connect(timer, &QTimer::timeout, this, &MainWindow::siguienteMovimiento);
+    connect(timerJuego, &QTimer::timeout, this, [this]() {
+        tiempoTranscurrido++;
+        int minutos = tiempoTranscurrido / 60;
+        int segundos = tiempoTranscurrido % 60;
+        lblTiempo->setText(QString("Tiempo: %1:%2")
+            .arg(minutos, 2, 10, QChar('0'))
+            .arg(segundos, 2, 10, QChar('0')));
+    });
+    connect(sliderVelocidad, &QSlider::valueChanged, this, &MainWindow::cambiarVelocidad);
+    
+    // Configuración de ventana
+    setWindowTitle("Torres de Hanoi - Juego Interactivo");
+    resize(1000, 700);
+    
+    crearTorres();
+}
+
+void MainWindow::crearTorres()
+{
+    torres.clear();
+    
+    int anchoEscena = 900;
+    int altoEscena = 400;
+    escena->setSceneRect(0, 0, anchoEscena, altoEscena);
+    
+    int separacion = anchoEscena / 3;
+    int baseY = altoEscena - 50;
+    
+    for (int i = 0; i < 3; i++) {
+        int x = separacion / 2 + i * separacion;
+        Torre *torre = new Torre(x, baseY, i);
+        torres.push_back(torre);
+        escena->addItem(torre);
+    }
+}
+
+void MainWindow::crearDiscos(int cantidad)
+{
+    limpiarDiscos();
+    numDiscos = cantidad;
+    
+    int anchoMax = 150;
+    int anchoMin = 60;
+    int alto = 25;
+    
+    for (int i = 0; i < cantidad; i++) {
+        int ancho = anchoMax - (i * (anchoMax - anchoMin) / (cantidad - 1));
+        Disco *disco = new Disco(ancho, alto, cantidad - i);
+        discos.push_back(disco);
+        escena->addItem(disco);
+        
+        // Colocar en la primera torre
+        torres[0]->agregarDisco(disco);
+    }
+    
+    actualizarEstadisticas();
+}
+
+void MainWindow::limpiarDiscos()
+{
+    for (auto disco : discos) {
+        escena->removeItem(disco);
+        delete disco;
+    }
+    discos.clear();
+    
+    for (auto torre : torres) {
+        torre->limpiar();
+    }
+}
+
+void MainWindow::iniciarJuego()
+{
+    numDiscos = spinDiscos->value();
+    contadorMovimientos = 0;
+    tiempoTranscurrido = 0;
+    juegoIniciado = true;
+    resolviendoAutomatico = false;
+    movimientos.clear();
+    
+    crearDiscos(numDiscos);
+    
+    btnIniciar->setEnabled(false);
+    btnResolver->setEnabled(true);
+    btnResolverDesde->setEnabled(true);
+    btnReiniciar->setEnabled(true);
+    spinDiscos->setEnabled(false);
+    
+    timerJuego->start();
+    
+    actualizarEstadisticas();
+}
+
+void MainWindow::resolverAutomatico()
+{
+    if (resolviendoAutomatico) return;
+    
+    movimientos.clear();
+    movimientoActual = 0;
+    resolviendoAutomatico = true;
+    
+    btnResolver->setEnabled(false);
+    btnResolverDesde->setEnabled(false);
+    
+    // Calcular solución desde el inicio
+    calcularSolucion(numDiscos, 0, 2, 1);
+    
+    // Iniciar animación
+    velocidadAnimacion = 1000 - (sliderVelocidad->value() * 90);
+    timer->start(velocidadAnimacion);
+}
+
+void MainWindow::resolverDesdeAqui()
+{
+    if (resolviendoAutomatico) return;
+    
+    // Obtener estado actual
+    std::vector<std::stack<int>> estado(3);
+    
+    for (int i = 0; i < 3; i++) {
+        auto discosEnTorre = torres[i]->obtenerDiscos();
+        for (auto disco : discosEnTorre) {
+            estado[i].push(disco->obtenerTamano());
+        }
+    }
+    
+    movimientos.clear();
+    movimientoActual = 0;
+    resolviendoAutomatico = true;
+    
+    btnResolver->setEnabled(false);
+    btnResolverDesde->setEnabled(false);
+    
+    resolverDesdeEstado(estado);
+    
+    velocidadAnimacion = 1000 - (sliderVelocidad->value() * 90);
+    timer->start(velocidadAnimacion);
+}
+
+void MainWindow::resolverDesdeEstado(std::vector<std::stack<int>> estado)
+{
+    // Algoritmo para resolver desde un estado arbitrario
+    // Primero, identificar dónde están los discos
+    std::vector<int> posiciones(numDiscos + 1); // posiciones[i] = torre donde está el disco i
+    
+    for (int torre = 0; torre < 3; torre++) {
+        std::stack<int> copia = estado[torre];
+        std::vector<int> temp;
+        while (!copia.empty()) {
+            temp.push_back(copia.top());
+            copia.pop();
+        }
+        std::reverse(temp.begin(), temp.end());
+        for (int disco : temp) {
+            posiciones[disco] = torre;
+        }
+    }
+    
+    // Resolver moviendo todos los discos a la torre 2
+    std::function<void(int, int, int, int)> resolver;
+    resolver = [&](int n, int origen, int destino, int auxiliar) {
+        if (n == 0) return;
+        
+        // Verificar dónde está realmente el disco n
+        int torreActual = posiciones[n];
+        
+        if (torreActual == destino) {
+            // Ya está en el destino, resolver el resto
+            resolver(n - 1, origen, destino, auxiliar);
+            return;
+        }
+        
+        // Mover discos más pequeños que estorban
+        for (int i = 1; i < n; i++) {
+            if (posiciones[i] == destino && posiciones[i] != auxiliar) {
+                // Mover disco i a torre auxiliar temporal
+                int otraAux = 3 - torreActual - destino;
+                movimientos.push_back({posiciones[i], otraAux});
+                posiciones[i] = otraAux;
+            }
+        }
+        
+        // Resolver recursivamente
+        resolver(n - 1, origen, auxiliar, destino);
+        
+        if (posiciones[n] != destino) {
+            movimientos.push_back({posiciones[n], destino});
+            posiciones[n] = destino;
+        }
+        
+        resolver(n - 1, auxiliar, destino, origen);
+    };
+    
+    resolver(numDiscos, 0, 2, 1);
+}
+
+void MainWindow::calcularSolucion(int n, int origen, int destino, int auxiliar)
+{
+    if (n == 1) {
+        movimientos.push_back({origen, destino});
+        return;
+    }
+    
+    calcularSolucion(n - 1, origen, auxiliar, destino);
+    movimientos.push_back({origen, destino});
+    calcularSolucion(n - 1, auxiliar, destino, origen);
+}
+
+void MainWindow::siguienteMovimiento()
+{
+    if (movimientoActual >= movimientos.size()) {
+        timer->stop();
+        resolviendoAutomatico = false;
+        btnReiniciar->setEnabled(true);
+        
+        if (juegoCompletado()) {
+            timerJuego->stop();
+            QMessageBox::information(this, "¡Felicidades!", 
+                QString("¡Juego completado!\n\nMovimientos: %1\nMínimo posible: %2\nTiempo: %3:%4")
+                .arg(contadorMovimientos)
+                .arg((int)pow(2, numDiscos) - 1)
+                .arg(tiempoTranscurrido / 60, 2, 10, QChar('0'))
+                .arg(tiempoTranscurrido % 60, 2, 10, QChar('0')));
+        }
+        return;
+    }
+    
+    auto movimiento = movimientos[movimientoActual];
+    moverDisco(movimiento.first, movimiento.second, true);
+    movimientoActual++;
+}
+
+void MainWindow::moverDisco(int desde, int hacia, bool animado)
+{
+    if (!verificarMovimientoValido(desde, hacia)) {
+        QMessageBox::warning(this, "Movimiento inválido", 
+            "No puedes colocar un disco más grande sobre uno más pequeño.");
+        return;
+    }
+    
+    Disco *disco = torres[desde]->quitarDisco();
+    if (!disco) return;
+    
+    torres[hacia]->agregarDisco(disco);
+    contadorMovimientos++;
+    actualizarEstadisticas();
+    
+    if (!resolviendoAutomatico && juegoCompletado()) {
+        timerJuego->stop();
+        QMessageBox::information(this, "¡Felicidades!", 
+            QString("¡Has completado el juego!\n\nMovimientos: %1\nMínimo posible: %2\nTiempo: %3:%4")
+            .arg(contadorMovimientos)
+            .arg((int)pow(2, numDiscos) - 1)
+            .arg(tiempoTranscurrido / 60, 2, 10, QChar('0'))
+            .arg(tiempoTranscurrido % 60, 2, 10, QChar('0')));
+    }
+}
+
+bool MainWindow::verificarMovimientoValido(int desde, int hacia)
+{
+    if (torres[desde]->estaVacia()) return false;
+    if (torres[hacia]->estaVacia()) return true;
+    
+    return torres[desde]->obtenerDiscoSuperior()->obtenerTamano() < 
+           torres[hacia]->obtenerDiscoSuperior()->obtenerTamano();
+}
+
+bool MainWindow::juegoCompletado()
+{
+    return torres[2]->obtenerDiscos().size() == numDiscos;
+}
+
+void MainWindow::actualizarEstadisticas()
+{
+    lblMovimientos->setText(QString("Movimientos: %1").arg(contadorMovimientos));
+    int minMovimientos = (int)pow(2, numDiscos) - 1;
+    lblMinMovimientos->setText(QString("Mínimo: %1").arg(minMovimientos));
+}
+
+void MainWindow::reiniciar()
+{
+    timer->stop();
+    timerJuego->stop();
+    
+    contadorMovimientos = 0;
+    tiempoTranscurrido = 0;
+    juegoIniciado = false;
+    resolviendoAutomatico = false;
+    movimientos.clear();
+    
+    limpiarDiscos();
+    
+    btnIniciar->setEnabled(true);
+    btnResolver->setEnabled(false);
+    btnResolverDesde->setEnabled(false);
+    btnReiniciar->setEnabled(false);
+    spinDiscos->setEnabled(true);
+    
+    actualizarEstadisticas();
+}
+
+void MainWindow::cambiarVelocidad(int valor)
+{
+    velocidadAnimacion = 1000 - (valor * 90);
+    
+    QString texto;
+    if (valor <= 3) texto = "Muy lenta";
+    else if (valor <= 5) texto = "Lenta";
+    else if (valor <= 7) texto = "Normal";
+    else if (valor <= 9) texto = "Rápida";
+    else texto = "Muy rápida";
+    
+    lblVelocidad->setText(texto);
+    
+    if (timer->isActive()) {
+        timer->setInterval(velocidadAnimacion);
+    }
+}
+
+void MainWindow::cambiarTema()
+{
+    temaOscuro = !temaOscuro;
+    aplicarTema();
+}
+
+void MainWindow::aplicarTema()
+{
+    if (temaOscuro) {
+        setStyleSheet(
+            "QMainWindow { background-color: #2c3e50; }"
+            "QWidget { background-color: #34495e; color: #ecf0f1; }"
+            "QLabel { color: #ecf0f1; }"
+            "QGroupBox { border: 2px solid #7f8c8d; border-radius: 5px; margin-top: 10px; padding-top: 10px; }"
+            "QGroupBox::title { color: #ecf0f1; }"
+        );
+        btnTema->setText("☀️ Tema Claro");
+        vistaGrafica->setStyleSheet("border: 2px solid #7f8c8d; border-radius: 5px; background-color: #2c3e50;");
+    } else {
+        setStyleSheet(
+            "QMainWindow { background-color: #ecf0f1; }"
+            "QWidget { background-color: white; color: #2c3e50; }"
+            "QLabel { color: #2c3e50; }"
+            "QGroupBox { border: 2px solid #bdc3c7; border-radius: 5px; margin-top: 10px; padding-top: 10px; }"
+        );
+        btnTema->setText("🌙 Tema Oscuro");
+        vistaGrafica->setStyleSheet("border: 2px solid #34495e; border-radius: 5px; background-color: white;");
+    }
+    
+    escena->setBackgroundBrush(temaOscuro ? QBrush(QColor(44, 62, 80)) : QBrush(Qt::white));
+    
+    // Actualizar colores de torres
+    for (auto torre : torres) {
+        torre->setTemaOscuro(temaOscuro);
+    }
+}
+
+void MainWindow::mousePressEvent(QMouseEvent *event)
+{
+    if (!juegoIniciado || resolviendoAutomatico) {
+        QMainWindow::mousePressEvent(event);
+        return;
+    }
+    
+    QPointF escenaPos = vistaGrafica->mapToScene(
+        vistaGrafica->mapFromGlobal(event->globalPosition().toPoint()));
+    
+    QGraphicsItem *item = escena->itemAt(escenaPos, vistaGrafica->transform());
+    
+    // Verificar si se clickeó una torre
+    for (int i = 0; i < torres.size(); i++) {
+        if (item == torres[i]) {
+            if (discoSeleccionado) {
+                // Mover el disco seleccionado a esta torre
+                moverDisco(torreOrigen, i, false);
+                discoSeleccionado->setSeleccionado(false);
+                discoSeleccionado = nullptr;
+                torreOrigen = -1;
+            } else {
+                // Seleccionar el disco superior de esta torre
+                if (!torres[i]->estaVacia()) {
+                    discoSeleccionado = torres[i]->obtenerDiscoSuperior();
+                    discoSeleccionado->setSeleccionado(true);
+                    torreOrigen = i;
+                }
+            }
+            return;
+        }
+    }
+    
+    // Verificar si se clickeó un disco
+    Disco *disco = dynamic_cast<Disco*>(item);
+    if (disco) {
+        // Encontrar en qué torre está
+        for (int i = 0; i < torres.size(); i++) {
+            if (torres[i]->obtenerDiscoSuperior() == disco) {
+                if (discoSeleccionado) {
+                    discoSeleccionado->setSeleccionado(false);
+                }
+                discoSeleccionado = disco;
+                discoSeleccionado->setSeleccionado(true);
+                torreOrigen = i;
+                return;
+            }
+        }
+    }
+    
+    // Click en área vacía - deseleccionar
+    if (discoSeleccionado) {
+        discoSeleccionado->setSeleccionado(false);
+        discoSeleccionado = nullptr;
+        torreOrigen = -1;
+    }
+    
+    QMainWindow::mousePressEvent(event);
+}

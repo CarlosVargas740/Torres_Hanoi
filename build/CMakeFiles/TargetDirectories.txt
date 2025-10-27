@@ -1,0 +1,5 @@
+/home/charly/Documentos/Programacion Estructurada/torres_hanoi/build/CMakeFiles/TorresDeHanoi.dir
+/home/charly/Documentos/Programacion Estructurada/torres_hanoi/build/CMakeFiles/edit_cache.dir
+/home/charly/Documentos/Programacion Estructurada/torres_hanoi/build/CMakeFiles/rebuild_cache.dir
+/home/charly/Documentos/Programacion Estructurada/torres_hanoi/build/CMakeFiles/TorresDeHanoi_autogen_timestamp_deps.dir
+/home/charly/Documentos/Programacion Estructurada/torres_hanoi/build/CMakeFiles/TorresDeHanoi_autogen.dir
