@@ -606,7 +606,7 @@ gdb ./TorresDeHanoi
 
 ## 📄 Licencia
 
-Este proyecto fue desarrollado con fines educativos para la **Universidad Politécnica de Valencia**.
+Este proyecto fue desarrollado con fines educativos para la **Universidad Politécnica de Victoria**.
 
 **Uso Académico** - © 2025 Equipo Torres de Hanoi
 
@@ -614,7 +614,7 @@ Este proyecto fue desarrollado con fines educativos para la **Universidad Polit�
 
 ## 👏 Agradecimientos
 
-- **Universidad Politécnica de Valencia** - Formación en POO y Estructuras de Datos
+- **Universidad Politécnica de Victoria** - Formación en POO y Estructuras de Datos
 - **Profesores** - Guía y mentoría en el desarrollo
 - **Comunidad Qt** - Documentación y recursos
 - **Stack Overflow** - Solución de problemas técnicos
